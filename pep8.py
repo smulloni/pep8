@@ -121,6 +121,8 @@ BINARY_OPERATORS = """
 UNARY_OPERATORS = ['**', '*', '+', '-']
 OPERATORS = BINARY_OPERATORS + UNARY_OPERATORS
 
+MAX_LINE_LENGTH = 79
+
 options = None
 args = None
 
@@ -209,8 +211,8 @@ def maximum_line_length(physical_line):
     length to 72 characters is recommended.
     """
     length = len(physical_line.rstrip())
-    if length > 79:
-        return 79, "E501 line too long (%d characters)" % length
+    if length > MAX_LINE_LENGTH:
+        return MAX_LINE_LENGTH, "E501 line too long (%d characters)" % length
 
 
 ##############################################################################
@@ -1183,6 +1185,10 @@ def process_options(arglist=None):
                       help="run regression tests from dir")
     parser.add_option('--doctest', action='store_true',
                       help="run doctest on myself")
+    parser.add_option('--max-line-length', action='store',
+                      default=79, dest="maxlinelength",
+                      metavar="anumber",
+                      help="maximum line length (default: 79)")
     options, args = parser.parse_args(arglist)
     if options.testsuite:
         args.append(options.testsuite)
@@ -1206,6 +1212,11 @@ def process_options(arglist=None):
     else:
         # The default choice: all checks are required
         options.ignore = []
+    global MAX_LINE_LENGTH
+    try:
+        MAX_LINE_LENGTH = int(options.maxlinelength)
+    except (ValueError, TypeError):
+        parser.error("max line length must be an integer")
     options.physical_checks = find_checks('physical_line')
     options.logical_checks = find_checks('logical_line')
     options.counters = {}
