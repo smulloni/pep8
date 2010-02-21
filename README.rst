@@ -1,8 +1,8 @@
 pep8 - Python style guide checker
 =================================
 
-pep8 is a tool to check your Python code against some of the style conventions
-in `PEP 8`_.
+pep8 is a tool to check your Python code against some of the style
+conventions in `PEP 8`_.
 
 .. _PEP 8: http://www.python.org/dev/peps/pep-0008/
 
@@ -19,8 +19,8 @@ Features
 
 * Parseable output: Jump to error location in your editor.
 
-* Small: Just one Python file, requires only stdlib.  You can use just the
-  pep8.py file for this purpose.
+* Small: Just one Python file, requires only stdlib. You can use just
+  the pep8.py file for this purpose.
 
 * Easy_installable, of course!
 
@@ -80,6 +80,7 @@ Quick help is available on the command line::
   Usage: pep8.py [options] input ...
 
   Options:
+    --version            show program's version number and exit
     -h, --help           show this help message and exit
     -v, --verbose        print status messages, or debug with -vv
     -q, --quiet          report only file names, or nothing with -qq
@@ -93,7 +94,8 @@ Quick help is available on the command line::
     --show-source        show source code for each error
     --show-pep8          show text of PEP 8 for each error
     --statistics         count errors and warnings
-    --count              count total number of errors and warnings
+    --count              print total number of errors and warnings to standard
+                         error and set exit code to 1 if total is not null
     --benchmark          measure processing speed
     --testsuite=dir      run regression tests from dir
     --doctest            run doctest on myself

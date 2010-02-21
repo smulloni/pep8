@@ -92,6 +92,8 @@ for space.
 
 """
 
+__version__ = '0.5.0'
+
 import os
 import sys
 import re
@@ -102,22 +104,20 @@ from optparse import OptionParser
 from keyword import iskeyword
 from fnmatch import fnmatch
 
-__version__ = '0.5dev'
-__revision__ = '$Rev$'
-
 DEFAULT_EXCLUDE = '.svn,CVS,.bzr,.hg,.git'
+DEFAULT_IGNORE = ['E24']
 
 INDENT_REGEX = re.compile(r'([ \t]*)')
 RAISE_COMMA_REGEX = re.compile(r'raise\s+\w+\s*(,)')
 SELFTEST_REGEX = re.compile(r'(Okay|[EW]\d{3}):\s(.*)')
 ERRORCODE_REGEX = re.compile(r'[EW]\d{3}')
+E301NOT_REGEX = re.compile(r'class |def |u?r?["\']')
 
 WHITESPACE = ' \t'
 
-BINARY_OPERATORS = """
-+= != %= ^= &= |= == **= //= >>= <<= // >> <<
--= <> %  ^  &  |  =   *=  /=  >=  <= /  >  <
-""".split()
+BINARY_OPERATORS = ['**=', '*=', '+=', '-=', '!=', '<>',
+    '%=', '^=', '&=', '|=', '==', '/=', '//=', '>=', '<=', '>>=', '<<=',
+    '%',  '^',  '&',  '|',  '=',  '/',  '//',  '>',  '<',  '>>',  '<<']
 UNARY_OPERATORS = ['**', '*', '+', '-']
 OPERATORS = BINARY_OPERATORS + UNARY_OPERATORS
 
@@ -236,9 +236,9 @@ def blank_lines(logical_line, blank_lines, indent_level, line_number,
     Okay: def a():\n    pass\n\n\ndef b():\n    pass
     Okay: def a():\n    pass\n\n\n# Foo\n# Bar\n\ndef b():\n    pass
 
-    E301: class Foo:\n    def bar():\n        pass
+    E301: class Foo:\n    b = 0\n    def bar():\n        pass
     E302: def a():\n    pass\n\ndef b(n):\n    pass
-    E302: def a():\n    pass\n\n\n\ndef b(n):\n    pass
+    E303: def a():\n    pass\n\n\n\ndef b(n):\n    pass
     E303: def a():\n\n\n\n    pass
     E304: @decorator\n\ndef a():\n    pass
     """
@@ -248,16 +248,16 @@ def blank_lines(logical_line, blank_lines, indent_level, line_number,
     if previous_logical.startswith('@'):
         if max_blank_lines:
             return 0, "E304 blank lines found after function decorator"
+    elif max_blank_lines > 2 or (indent_level and max_blank_lines == 2):
+        return 0, "E303 too many blank lines (%d)" % max_blank_lines
     elif (logical_line.startswith('def ') or
           logical_line.startswith('class ') or
           logical_line.startswith('@')):
-        if indent_level and max_blank_lines != 1:
-            return 0, "E301 expected 1 blank line, found %d" % max_blank_lines
-        elif not indent_level and max_blank_lines != 2:
+        if indent_level:
+            if not (max_blank_lines or E301NOT_REGEX.match(previous_logical)):
+                return 0, "E301 expected 1 blank line, found 0"
+        elif max_blank_lines != 2:
             return 0, "E302 expected 2 blank lines, found %d" % max_blank_lines
-    elif (max_blank_lines > 2 or
-         (indent_level and max_blank_lines == 2)):
-        return 0, "E303 too many blank lines (%d)" % max_blank_lines
 
 
 def extraneous_whitespace(logical_line):
@@ -483,6 +483,11 @@ def whitespace_around_comma(logical_line):
       align it with another.
 
     JCR: This should also be applied around comma etc.
+    Note: these checks are disabled by default
+
+    Okay: a = (1, 2)
+    E241: a = (1,  2)
+    E242: a = (1,\t2)
     """
     line = logical_line
     for separator in ',;:':
@@ -757,7 +762,7 @@ def find_checks(argument_name):
     return checks
 
 
-class Checker:
+class Checker(object):
     """
     Load a Python source file, tokenize it, check coding style.
     """
@@ -1151,8 +1156,8 @@ def process_options(arglist=None):
     Process options passed either via arglist or via command line args.
     """
     global options, args
-    usage = "%prog [options] input ..."
-    parser = OptionParser(usage)
+    parser = OptionParser(version=__version__,
+                          usage="%prog [options] input ...")
     parser.add_option('-v', '--verbose', default=0, action='count',
                       help="print status messages, or debug with -vv")
     parser.add_option('-q', '--quiet', default=0, action='count',
@@ -1178,7 +1183,9 @@ def process_options(arglist=None):
     parser.add_option('--statistics', action='store_true',
                       help="count errors and warnings")
     parser.add_option('--count', action='store_true',
-                      help="count total number of errors and warnings")
+                      help="print total number of errors and warnings "
+                        "to standard error and set exit code to 1 if "
+                        "total is not null")
     parser.add_option('--benchmark', action='store_true',
                       help="measure processing speed")
     parser.add_option('--testsuite', metavar='dir',
@@ -1209,14 +1216,19 @@ def process_options(arglist=None):
     elif options.select:
         # Ignore all checks which are not explicitly selected
         options.ignore = ['']
-    else:
-        # The default choice: all checks are required
+    elif options.testsuite or options.doctest:
+        # For doctest and testsuite, all checks are required
         options.ignore = []
+    else:
+        # The default choice: ignore controversial checks
+        options.ignore = DEFAULT_IGNORE        
+
     global MAX_LINE_LENGTH
     try:
         MAX_LINE_LENGTH = int(options.maxlinelength)
     except (ValueError, TypeError):
         parser.error("max line length must be an integer")
+
     options.physical_checks = find_checks('physical_line')
     options.logical_checks = find_checks('logical_line')
     options.counters = {}
@@ -1245,7 +1257,10 @@ def _main():
     if options.benchmark:
         print_benchmark(elapsed)
     if options.count:
-        print(get_count())
+        count = get_count()
+        if count:
+            sys.stderr.write(str(count) + '\n')
+            sys.exit(1)
 
 
 if __name__ == '__main__':
