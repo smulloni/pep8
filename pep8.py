@@ -1221,7 +1221,7 @@ def process_options(arglist=None):
         options.ignore = []
     else:
         # The default choice: ignore controversial checks
-        options.ignore = DEFAULT_IGNORE        
+        options.ignore = DEFAULT_IGNORE
 
     global MAX_LINE_LENGTH
     try:
